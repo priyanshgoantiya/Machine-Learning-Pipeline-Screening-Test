@@ -1,0 +1,123 @@
+{
+    "target": {
+        "prediction_type": "Regression",
+        "target": "petal_width",
+        "type": "regression",
+        "partitioning": True
+    },
+    "feature_handling": {
+        "sepal_length": {
+            "feature_name": "sepal_length",
+            "is_selected": True,
+            "feature_variable_type": "numerical",
+            "feature_details": {
+                "numerical_handling": "Keep as regular numerical feature",
+                "rescaling": "Standardize (mean=0, std=1)",
+                "make_derived_feats": False,
+                "missing_values": "Impute",
+                "impute_with": "Average of values",
+                "impute_value": 5.86
+            }
+        },
+        "sepal_width": {
+            "feature_name": "sepal_width",
+            "is_selected": True,
+            "feature_variable_type": "numerical",
+            "feature_details": {
+                "numerical_handling": "Keep as regular numerical feature",
+                "rescaling": "Standardize (mean=0, std=1)",
+                "make_derived_feats": False,
+                "missing_values": "Impute",
+                "impute_with": "Constant",
+                "impute_value": 3
+            }
+        },
+        "petal_length": {
+            "feature_name": "petal_length",
+            "is_selected": True,
+            "feature_variable_type": "numerical",
+            "feature_details": {
+                "numerical_handling": "Keep as regular numerical feature",
+                "rescaling": "Standardize (mean=0, std=1)",
+                "make_derived_feats": False,
+                "missing_values": "Impute",
+                "impute_with": "Average of values",
+                "impute_value": 3.73
+            }
+        }
+    },
+    "feature_reduction": {
+        "feature_reduction_method": "Correlation with target",
+        "No Reduction": {
+            "is_selected": False,
+            "num_of_features_to_keep": 5
+        },
+        "Correlation with target": {
+            "is_selected": False,
+            "num_of_features_to_keep": 2,
+            "threshold": 0.5
+        },
+        "Tree-based": {
+            "is_selected": False,
+            "num_of_features_to_keep": 2,
+            "depth_of_trees": 10,
+            "num_of_trees": 100
+        },
+        "Principal Component Analysis": {
+            "is_selected": True,
+            "num_of_features_to_keep": 2
+        }
+    },
+    "models": [
+        {
+            "model_name": "LinearRegression",
+            "is_selected": True,
+            "hyperparameters": {
+                "fit_intercept": [True, False]
+            }
+        },
+        {
+            "model_name": "RandomForestRegressor",
+            "is_selected": True,
+            "hyperparameters": {
+                "n_estimators": [50, 100, 150, 200],
+                "max_depth": [None, 10, 20, 30],
+                "min_samples_split": [2, 5, 10],
+                "min_samples_leaf": [1, 2, 4],
+                "max_features": ["sqrt", "log2", 0.5, None],
+                "bootstrap": [True, False],
+                "max_samples": [None, 0.5, 0.75],  # Controls sample size per tree
+                "warm_start": [True, False]  # Allows adding more trees
+            }
+        },
+        {
+            "model_name": "DecisionTreeRegressor",
+            "is_selected": True,
+            "hyperparameters": {
+                "criterion": ["squared_error", "absolute_error"],
+                "splitter": ["best", "random"],
+                "max_depth": [None, 5, 10, 20],
+                "min_samples_split": [2, 5, 10],
+                "min_samples_leaf": [1, 2, 4],
+                "max_features": [None, "sqrt", "log2", 0.5]
+            }
+        }
+    ],
+    "hyperparameters": {
+        "search_method": "Grid Search",
+        "Grid Search": {
+            "is_selected": True,
+            "shuffle_grid": True,
+            "random_state": 0,
+            "max_iterations": 10,
+            "max_search_time": 0,
+            "cross_validation_strategy": "Time-based K-fold(with overlap)",
+            "Time-based K-fold(with overlap)": {
+                "is_selected": True,
+                "num_of_folds": 5,
+                "split_ratio": 0,
+                "stratified": False
+            }
+        }
+    }
+}
