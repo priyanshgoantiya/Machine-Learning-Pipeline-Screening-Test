@@ -53,7 +53,7 @@ class PassthroughTransformer(BaseEstimator, TransformerMixin):
     def transform(self, X):
         return X
 
-def load_config(json_file='algoparams_from_ui.json'):
+def load_config(json_file='config/algoparams_from_ui.json'):
     """Load and parse the JSON configuration."""
     try:
         with open(json_file, 'r') as f:
