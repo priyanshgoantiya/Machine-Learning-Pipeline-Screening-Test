@@ -85,7 +85,7 @@
                 "min_samples_split": [2, 5, 10],
                 "min_samples_leaf": [1, 2, 4],
                 "max_features": ["sqrt", "log2", 0.5, None],
-                "bootstrap": [True, False],
+                "bootstrap": [True],
                 "max_samples": [None, 0.5, 0.75],  # Controls sample size per tree
                 "warm_start": [True, False]  # Allows adding more trees
             }
