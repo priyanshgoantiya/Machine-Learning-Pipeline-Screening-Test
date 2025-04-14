@@ -61,7 +61,7 @@ def load_config(json_file='config/algoparams_from_ui.json'):
     except FileNotFoundError:
         raise FileNotFoundError(f"Configuration file {json_file} not found")
 
-def load_data(config, data_file='data/data.csv'):
+def load_data(config, data_file='data'):
     """Load dataset and split into features and target."""
     try:
         data = pd.read_csv(data_file)
