@@ -18,8 +18,8 @@ def generate_sample_data(output_file='data.csv', missing_rate=0.1, random_seed=4
     data[mask] = np.nan
     
     # Save to CSV
-    data.to_csv(data.csv, index=False)
-    print(f"Generated dataset saved to {data.csv}")
+    data.to_csv(output_file, index=False)
+    print(f"Generated dataset saved to '{output_file}'")
 
 if __name__ == "__main__":
     generate_sample_data()
