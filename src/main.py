@@ -40,12 +40,12 @@ class PassthroughTransformer(BaseEstimator, TransformerMixin):
     def transform(self, X): return X
 
 # === Config Load ===
-def load_config(file_path='/kaggle/working/algoparams_from_ui.json'):
+def load_config(file_path='config/algoparams_from_ui.json'):
     with open(file_path, 'r') as f:
         return json.load(f)
 
 # === Data Load ===
-def load_data(config, file_path='/kaggle/working/output.csv'):
+def load_data(config, file_path='output.csv'):
     df = pd.read_csv(file_path)
     target = config['target']['target']
     features = [f for f, meta in config['feature_handling'].items() if meta['is_selected']]
