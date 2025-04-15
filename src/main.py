@@ -13,6 +13,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.base import BaseEstimator, TransformerMixin
 
+# === Custom Feature Reduction (Correlation with Target) ===
 class CorrelationThresholdSelector(BaseEstimator, TransformerMixin):
     def __init__(self, threshold=0.5, num_features=None):
         self.threshold = threshold
@@ -20,169 +21,135 @@ class CorrelationThresholdSelector(BaseEstimator, TransformerMixin):
         self.selected_indices_ = None
 
     def fit(self, X, y):
-        if isinstance(X, pd.DataFrame):
-            X = X.to_numpy()
-        correlations = np.array([np.abs(np.corrcoef(X[:, i], y)[0, 1]) for i in range(X.shape[1])])
+        X_np = X.to_numpy() if isinstance(X, pd.DataFrame) else X
+        correlations = np.array([np.abs(np.corrcoef(X_np[:, i], y)[0, 1]) for i in range(X_np.shape[1])])
         if self.num_features:
             self.selected_indices_ = np.argsort(correlations)[-self.num_features:]
         else:
             self.selected_indices_ = np.where(correlations > self.threshold)[0]
         if len(self.selected_indices_) == 0:
-            self.selected_indices_ = np.arange(X.shape[1])  # Fallback to all features
+            self.selected_indices_ = np.arange(X_np.shape[1])
         return self
 
     def transform(self, X):
-        if isinstance(X, pd.DataFrame):
-            return X.iloc[:, self.selected_indices_]
-        return X[:, self.selected_indices_]
+        return X.iloc[:, self.selected_indices_] if isinstance(X, pd.DataFrame) else X[:, self.selected_indices_]
 
-# Passthrough transformer for no reduction
+# === Passthrough ===
 class PassthroughTransformer(BaseEstimator, TransformerMixin):
-    def fit(self, X, y=None):
-        return self
-    def transform(self, X):
-        return X
+    def fit(self, X, y=None): return self
+    def transform(self, X): return X
 
-def load_config(json_file):
-    """Load and parse the JSON configuration."""
-    with open('/content/algoparams_from_ui.json', 'r') as f:
+# === Config Load ===
+def load_config(file_path='/kaggle/working/algoparams_from_ui.json'):
+    with open(file_path, 'r') as f:
         return json.load(f)
 
-def load_data(config, data_file='/content/output.csv'):
-    """Load dataset and split into features and target."""
-    data = pd.read_csv(data_file)
+# === Data Load ===
+def load_data(config, file_path='/kaggle/working/output.csv'):
+    df = pd.read_csv(file_path)
     target = config['target']['target']
-    features = [f for f, details in config['feature_handling'].items() if details['is_selected']]
-    
-    # Drop rows with NaN in the target column
-    data = data.dropna(subset=[target])
-    
-    X = data[features]
-    y = data[target]
-    return X, y
+    features = [f for f, meta in config['feature_handling'].items() if meta['is_selected']]
+    df = df.dropna(subset=[target])
+    return df[features], df[target]
 
-def create_imputation_transformer(config):
-    """Create ColumnTransformer for imputation based on feature_handling."""
+# === Imputer Builder ===
+def create_imputer(config):
     transformers = []
-    for feature, details in config['feature_handling'].items():
-        if not details['is_selected']:
-            continue
-        impute_with = details['feature_details']['impute_with']
-        impute_value = details['feature_details']['impute_value']
-        if impute_with == 'Average of values':
-            imputer = SimpleImputer(strategy='mean')
-        elif impute_with == 'Median of values':
-            imputer = SimpleImputer(strategy='median')
-        elif impute_with == 'Constant':
-            imputer = SimpleImputer(strategy='constant', fill_value=impute_value)
+    for feature, meta in config['feature_handling'].items():
+        if not meta['is_selected']: continue
+        method = meta['feature_details']['impute_with']
+        value = meta['feature_details']['impute_value']
+        if method == 'Average of values':
+            imp = SimpleImputer(strategy='mean')
+        elif method == 'Median of values':
+            imp = SimpleImputer(strategy='median')
+        elif method == 'Constant':
+            imp = SimpleImputer(strategy='constant', fill_value=value)
         else:
-            raise ValueError(f"Unknown imputation method: {impute_with}")
-        transformers.append((f'imputer_{feature}', imputer, [feature]))
+            raise ValueError(f"Invalid impute method: {method}")
+        transformers.append((f'imp_{feature}', imp, [feature]))
     return ColumnTransformer(transformers, remainder='passthrough')
 
-def create_feature_reduction_transformer(config, prediction_type):
-    """Create feature reduction transformer based on feature_reduction."""
+# === Feature Reducer Builder ===
+def create_feature_reducer(config):
     method = config['feature_reduction']['feature_reduction_method']
-    reduction_config = config['feature_reduction'].get(method, {})
-
+    opts = config['feature_reduction'].get(method, {})
     if method == 'No Reduction':
         return PassthroughTransformer()
     elif method == 'Principal Component Analysis':
-        n_components = reduction_config.get('num_of_features_to_keep', 2)
-        return PCA(n_components=n_components)
+        return PCA(n_components=opts.get('num_of_features_to_keep', 2))
     elif method == 'Correlation with target':
-        threshold = reduction_config.get('threshold', 0.5)
-        num_features = reduction_config.get('num_of_features_to_keep')
-        return CorrelationThresholdSelector(threshold=threshold, num_features=num_features)
+        return CorrelationThresholdSelector(
+            threshold=opts.get('threshold', 0.5),
+            num_features=opts.get('num_of_features_to_keep')
+        )
     elif method == 'Tree-based':
-        num_features = reduction_config.get('num_of_features_to_keep', 2)
-        max_depth = reduction_config.get('depth_of_trees', 10)
-        n_estimators = reduction_config.get('num_of_trees', 100)
-        estimator = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, random_state=0)
-        return SelectFromModel(estimator, max_features=num_features)
+        return SelectFromModel(
+            RandomForestRegressor(
+                n_estimators=opts.get('num_of_trees', 100),
+                max_depth=opts.get('depth_of_trees', 10),
+                random_state=0
+            ),
+            max_features=opts.get('num_of_features_to_keep', 2)
+        )
     else:
         raise ValueError(f"Unknown feature reduction method: {method}")
 
-def get_model_class(model_name, prediction_type):
-    """Return model class based on name and prediction type."""
-    if prediction_type == 'Regression':
-        models = {
+# === Model Class Resolver ===
+def get_model_class(name, task):
+    if task == 'Regression':
+        return {
             'LinearRegression': LinearRegression,
-            'RandomForestRegressor': RandomForestRegressor,'DecisionTreeRegressor':DecisionTreeRegressor
-        }
-    else:
-        raise ValueError(f"Unsupported prediction_type: {prediction_type}")
-    if model_name not in models:
-        raise ValueError(f"Model {model_name} not supported for {prediction_type}")
-    return models[model_name]
+            'RandomForestRegressor': RandomForestRegressor,
+            'DecisionTreeRegressor': DecisionTreeRegressor
+        }[name]
+    raise ValueError(f"Unsupported prediction_type: {task}")
 
+# === Main Pipeline Executor ===
 def main():
-    # Load configuration
-    config = load_config('algoparams_from_ui.json')
-    prediction_type = config['target']['prediction_type']
-
-    # Load data
+    config = load_config()
     X, y = load_data(config)
-    
-    # Split data
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Create imputation transformer
-    imputation_transformer = create_imputation_transformer(config)
+    imputer = create_imputer(config)
+    reducer = create_feature_reducer(config)
+    prediction_type = config['target']['prediction_type']
 
-    # Create feature reduction transformer
-    feature_reduction_transformer = create_feature_reduction_transformer(config, prediction_type)
+    for model_conf in config['models']:
+        if not model_conf['is_selected']: continue
+        name = model_conf['model_name']
+        hyperparams = model_conf.get('hyperparameters', {})
 
-    # Process models
-    for model_config in config['models']:
-        if not model_config['is_selected']:
-            continue
+        # Handle bootstrap-max_samples conflict
+        if name == "RandomForestRegressor" and 'bootstrap' in hyperparams and 'max_samples' in hyperparams:
+            if False in hyperparams['bootstrap']:
+                print(f"⚠️ Removing 'max_samples' because bootstrap=False is included for {name}")
+                del hyperparams['max_samples']
 
-        model_name = model_config['model_name']
-        hyperparams = model_config.get('hyperparameters', {})
-
-        # Create model
-        model_class = get_model_class(model_name, prediction_type)
-        model = model_class()
-
-        # Create pipeline
+        model_class = get_model_class(name, prediction_type)
         pipeline = Pipeline([
-            ('imputation', imputation_transformer),
-            ('feature_reduction', feature_reduction_transformer),
-            ('model', model)
+            ('imputer', imputer),
+            ('reducer', reducer),
+            ('model', model_class())
         ])
 
-        # Prepare GridSearchCV
-        param_grid = {f"model__{k}": v for k, v in hyperparams.items()}
-        cv_strategy = config['hyperparameters']['Grid Search']['Time-based K-fold(with overlap)']['num_of_folds']
-        grid_search = GridSearchCV(
-            pipeline,
-            param_grid,
-            cv=cv_strategy,
-            scoring='neg_mean_squared_error',
-            n_jobs=-1
-        )
+        grid_params = {f"model__{k}": v for k, v in hyperparams.items()}
+        folds = config['hyperparameters']['Grid Search']['Time-based K-fold(with overlap)']['num_of_folds']
 
-        # Fit and predict
+        search = GridSearchCV(pipeline, grid_params, scoring='neg_mean_squared_error', cv=folds, n_jobs=-1)
+        
         try:
-            grid_search.fit(X_train, y_train)
-            y_pred = grid_search.predict(X_test)
+            search.fit(X_train, y_train)
+            preds = search.predict(X_test)
 
-            # Compute metrics
-            mse = mean_squared_error(y_test, y_pred)
-            mae=mean_absolute_error(y_test, y_pred)
-            r2 = r2_score(y_test, y_pred)
-
-            # Log results
-            print(f"Model: {model_name}")
-            print(f"Best Parameters: {grid_search.best_params_}")
-            print(f"Mean Squared Error: {mse:.4f}")
-            print(f"Mean Absolute Error: {mae:.4f}")
-            print(f"R2 Score: {r2:.4f}")
-            print("-" * 50)
-
+            print(f"\n✅ Model: {name}")
+            print(f"Best Params: {search.best_params_}")
+            print(f"MSE: {mean_squared_error(y_test, preds):.4f}")
+            print(f"MAE: {mean_absolute_error(y_test, preds):.4f}")
+            print(f"R2 Score: {r2_score(y_test, preds):.4f}")
+            print("-" * 60)
         except Exception as e:
-            print(f"Error processing {model_name}: {str(e)}")
+            print(f"❌ Error with {name}: {e}")
 
 if __name__ == "__main__":
     main()
