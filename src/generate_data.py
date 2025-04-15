@@ -13,8 +13,8 @@ def generate_sample_data(output_file='output.csv', missing_rate=0.1, target_col=
     mask = np.random.rand(*data[feature_cols].shape) < missing_rate
     data.loc[:, feature_cols] = data.loc[:, feature_cols].mask(mask)
 
-    data.to_csv('output.csv', index=False)
-    print(f"✅ Dataset with missing values saved to '{'output.csv'}'")
+    data.to_csv(output_file, index=False)
+    print(f"✅ Dataset with missing values saved to '{output_file}'")
 
 if __name__ == "__main__":
     generate_sample_data()
