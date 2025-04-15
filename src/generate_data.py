@@ -18,3 +18,4 @@ def generate_sample_data(output_file='output.csv', missing_rate=0.1, target_col=
 
 if __name__ == "__main__":
     generate_sample_data()
+
