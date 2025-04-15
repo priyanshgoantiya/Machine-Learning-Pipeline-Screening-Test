@@ -13,7 +13,6 @@ from sklearn.linear_model import LinearRegression
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.base import BaseEstimator, TransformerMixin
 
-# === Custom Feature Reduction (Correlation with Target) ===
 class CorrelationThresholdSelector(BaseEstimator, TransformerMixin):
     def __init__(self, threshold=0.5, num_features=None):
         self.threshold = threshold
@@ -34,17 +33,14 @@ class CorrelationThresholdSelector(BaseEstimator, TransformerMixin):
     def transform(self, X):
         return X.iloc[:, self.selected_indices_] if isinstance(X, pd.DataFrame) else X[:, self.selected_indices_]
 
-# === Passthrough ===
 class PassthroughTransformer(BaseEstimator, TransformerMixin):
     def fit(self, X, y=None): return self
     def transform(self, X): return X
 
-# === Config Load ===
 def load_config(file_path='config/algoparams_from_ui.json'):
     with open(file_path, 'r') as f:
         return json.load(f)
 
-# === Data Load ===
 def load_data(config, file_path='output.csv'):
     df = pd.read_csv(file_path)
     target = config['target']['target']
@@ -52,7 +48,6 @@ def load_data(config, file_path='output.csv'):
     df = df.dropna(subset=[target])
     return df[features], df[target]
 
-# === Imputer Builder ===
 def create_imputer(config):
     transformers = []
     for feature, meta in config['feature_handling'].items():
@@ -70,7 +65,6 @@ def create_imputer(config):
         transformers.append((f'imp_{feature}', imp, [feature]))
     return ColumnTransformer(transformers, remainder='passthrough')
 
-# === Feature Reducer Builder ===
 def create_feature_reducer(config):
     method = config['feature_reduction']['feature_reduction_method']
     opts = config['feature_reduction'].get(method, {})
@@ -95,7 +89,6 @@ def create_feature_reducer(config):
     else:
         raise ValueError(f"Unknown feature reduction method: {method}")
 
-# === Model Class Resolver ===
 def get_model_class(name, task):
     if task == 'Regression':
         return {
@@ -105,7 +98,6 @@ def get_model_class(name, task):
         }[name]
     raise ValueError(f"Unsupported prediction_type: {task}")
 
-# === Main Pipeline Executor ===
 def main():
     config = load_config()
     X, y = load_data(config)
@@ -120,7 +112,6 @@ def main():
         name = model_conf['model_name']
         hyperparams = model_conf.get('hyperparameters', {})
 
-        # Handle bootstrap-max_samples conflict
         if name == "RandomForestRegressor" and 'bootstrap' in hyperparams and 'max_samples' in hyperparams:
             if False in hyperparams['bootstrap']:
                 print(f"⚠️ Removing 'max_samples' because bootstrap=False is included for {name}")
@@ -137,7 +128,7 @@ def main():
         folds = config['hyperparameters']['Grid Search']['Time-based K-fold(with overlap)']['num_of_folds']
 
         search = GridSearchCV(pipeline, grid_params, scoring='neg_mean_squared_error', cv=folds, n_jobs=-1)
-        
+
         try:
             search.fit(X_train, y_train)
             preds = search.predict(X_test)
